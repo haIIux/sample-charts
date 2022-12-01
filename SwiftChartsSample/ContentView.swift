@@ -49,8 +49,22 @@ struct ContentView: View {
         OilPriceAverage(date: Date.from(year: 2022, month: 11, day: 31), price: 2.10)
     ]
 
+    enum TimeRange: String, CaseIterable {
+        case day
+        case week
+        case month
+    }
+
+    @State var range: TimeRange = .month
+
     var body: some View {
-        VStack {
+        Form {
+            Picker("Range", selection: $range) {
+                ForEach(TimeRange.allCases, id: \.self) { unit in
+                    Text(unit.rawValue)
+                        .tag(unit)
+                }
+            }
             GroupBox {
                 Text("Weekly Average Price Chart")
                     .font(.headline)
@@ -59,8 +73,8 @@ struct ContentView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.secondary)
                     .padding(.bottom)
-                WeeklyChart
-                ChartLegend
+                weeklyChart
+                chartLegend
             }
             .frame(height: 350)
             .padding(.horizontal)
@@ -75,14 +89,26 @@ struct ContentView_Previews: PreviewProvider {
 }
 
 extension ContentView {
-    var WeeklyChart: some View {
+
+    var dataSet: [OilPriceAverage] {
+        switch range {
+        case .day:
+            return [oilPriceAverage.last!]
+        case .week:
+            return oilPriceAverage.suffix(7)
+        case .month:
+            return oilPriceAverage.suffix(31)
+        }
+    }
+
+    var weeklyChart: some View {
         Chart {
             RuleMark(y: .value("Average", priceAverage))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [5]))
 
-            ForEach(oilPriceAverage) { oil in
+            ForEach(dataSet) { oil in
                 BarMark(
-                    x: .value("Day", oil.date, unit: .weekSpan()),
+                    x: .value("Day", oil.date, unit: .day),
                     y: .value("Price", oil.price)
                 )
                 .foregroundStyle(oil.isAbove(average: priceAverage) ? .red : .green)
@@ -92,7 +118,7 @@ extension ContentView {
             AxisMarks(format: .currency(code: "USD"), position: .leading)
         }
         .chartXAxis {
-            AxisMarks(values: oilPriceAverage.map {$0.date}) { date in
+            AxisMarks(values: dataSet.map {$0.date}) { date in
                 AxisValueLabel(format: .dateTime.month().day())
             }
         }
@@ -103,7 +129,7 @@ extension ContentView {
         return (total / Double(oilPriceAverage.count))
     }
 
-    var ChartLegend: some View {
+    var chartLegend: some View {
         HStack {
             Image(systemName: "line.diagonal")
                 .rotationEffect(Angle(degrees: 45))
@@ -128,11 +154,6 @@ extension Date {
     static func from(year: Int, month: Int, day: Int) -> Date {
         let components = DateComponents(year: year, month: month, day: day)
         return Calendar.current.date(from: components)!
-    }
-
-    static func weekSpan() -> Date {
-        let components = DateComponents(.current)
-        return components.current.date(byAdding: .weekOfYear, value: -1, to: Date())!
     }
 }
 
